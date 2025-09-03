@@ -153,10 +153,11 @@ class CodeMentor {
     async generateAIResponse(userMessage) {
         // Use Gemini API with provided API key
         const API_KEY = 'AIzaSyAPBW9vmiiymr3XvSadaqN9ZlQ75yKR-V4';
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'x-goog-api-key': API_KEY,
             },
             body: JSON.stringify({
                 contents: [{
