@@ -176,7 +176,7 @@ class CodeMentor {
     async generateAIResponse(userMessage) {
         // Use Gemini API with @google/genai SDK and hide API key
         // IMPORTANT: Insert your Gemini API key below before running locally. DO NOT commit your real key to GitHub!
-        const API_KEY = 'PASTE_YOUR_GEMINI_API_KEY_HERE';
+        const API_KEY = 'YOUR_API_KEY_HERE'; // INSERT YOUR API KEY HERE
         // Dynamically import the SDK if not already loaded
         if (!window.GoogleGenAI) {
             await import('https://esm.sh/@google/genai');
