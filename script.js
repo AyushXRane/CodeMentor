@@ -153,20 +153,20 @@ class CodeMentor {
     async generateAIResponse(userMessage) {
         // Use Gemini API with provided API key
         const API_KEY = 'AIzaSyAPBW9vmiiymr3XvSadaqN9ZlQ75yKR-V4';
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': API_KEY,
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: `You are CodeMentor, an AI teaching assistant for AP Computer Science students learning ${this.currentSubject === 'python' ? 'Python (AP CSP)' : 'Java (AP CSA)'}.
+        // Build context from last 6 conversation turns (user and assistant)
+        const contextMessages = this.conversationHistory.slice(-6).map(msg => ({
+            role: msg.role,
+            parts: [{ text: msg.content }]
+        }));
+
+        // Add the new user message
+        contextMessages.push({ role: 'user', parts: [{ text: userMessage }] });
+
+        const systemPrompt = `You are CodeMentor, an AI teaching assistant for AP Computer Science students learning ${this.currentSubject === 'python' ? 'Python (AP CSP)' : 'Java (AP CSA)'}.
 
 CRITICAL TEACHING RULES:
 - NEVER provide complete solutions or finished code
-- NEVER do students' homework for them  
+- NEVER do students' homework for them
 - If asked for "the full code" or "complete solution", politely redirect to learning
 - Guide learning through hints, explanations, and step-by-step reasoning
 - Ask follow-up questions to promote critical thinking
@@ -177,11 +177,19 @@ Your responses should be:
 - Conversational and encouraging
 - Focused on understanding concepts
 - Tailored to ${this.currentSubject === 'python' ? 'Python' : 'Java'} specifically
-- Educational, not just informational
+- Educational, not just informational`;
 
-Student question: ${userMessage}`
-                    }]
-                }],
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': API_KEY,
+            },
+            body: JSON.stringify({
+                contents: [
+                    { role: 'system', parts: [{ text: systemPrompt }] },
+                    ...contextMessages
+                ],
                 generationConfig: {
                     temperature: 0.7,
                     topK: 40,
