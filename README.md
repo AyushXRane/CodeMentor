@@ -30,8 +30,26 @@ CodeMentor follows educational best practices by:
 
 ### Installation
 1. Clone or download this repository
-2. Open `index.html` in your web browser
-3. Start learning!
+2. Install the Google GenAI SDK:
+   ```sh
+   npm install @google/genai
+   ```
+   If running purely in the browser, the SDK is loaded dynamically from esm.sh (no install required).
+3. Set up your Gemini API Key (securely)
+   - **The API key is NEVER committed to GitHub.**
+   - On first use, CodeMentor will prompt you for your Gemini API key and store it in your browser's localStorage.
+   - You can also set it manually in your browser console:
+     ```js
+     localStorage.setItem('gemini_api_key', 'YOUR_API_KEY_HERE');
+     ```
+   - If running in Node.js, you can use a `.env` file (see `.env.example`).
+4. Run the App
+   - Open `index.html` in your browser
+   - Or serve locally with:
+     ```sh
+     python3 -m http.server 8000
+     # then visit http://localhost:8000
+     ```
 
 ### Usage
 1. **Select Subject**: Choose between Python (CSP) or Java (CSA) using the header buttons
