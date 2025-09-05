@@ -7,7 +7,6 @@ class CodeMentor {
         this.sendButton = document.getElementById('sendButton');
         this.topicList = document.getElementById('topicList');
         this.conversationHistory = [];
-        this.conversationSummary = '';
         this.lastTopic = null;
         
         this.initializeEventListeners();
@@ -140,7 +139,6 @@ class CodeMentor {
             this.hideTypingIndicator();
             this.addMessage('assistant', response);
             this.conversationHistory.push({ role: 'assistant', content: response });
-            this.updateConversationSummary();
         } catch (error) {
             this.hideTypingIndicator();
             console.error('Gemini API Error:', error);
@@ -152,69 +150,18 @@ class CodeMentor {
         }
     }
 
-    // Update the running summary after each assistant response
-    updateConversationSummary() {
-        // Only summarize up to the last 12 messages for efficiency
-        const historyToSummarize = this.conversationHistory.slice(-12);
-        let summary = '';
-        let lastGoal = '';
-        for (const msg of historyToSummarize) {
-            if (msg.role === 'user') {
-                summary += `Student: ${msg.content}\n`;
-                lastGoal = msg.content;
-            } else {
-                summary += `Mentor: ${msg.content}\n`;
-            }
-        }
-        // Add a final statement of the user's last goal
-        if (lastGoal) {
-            summary += `The student's current goal: ${lastGoal}\n`;
-        }
-        this.conversationSummary = summary;
-    }
-
     async generateAIResponse(userMessage) {
-        // Use Gemini API with @google/genai SDK and hide API key
-        // IMPORTANT: Insert your Gemini API key below before running locally. DO NOT commit your real key to GitHub!
-        const API_KEY = 'YOUR_API_KEY_HERE'; // INSERT YOUR API KEY HERE
-        // Dynamically import the SDK if not already loaded
-        if (!window.GoogleGenAI) {
-            await import('https://esm.sh/@google/genai');
-        }
-        const { GoogleGenAI } = window.GoogleGenAI || await import('https://esm.sh/@google/genai');
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
-        // Summarize earlier conversation (all but last 10 messages)
-        let summary = '';
-        if (this.conversationHistory.length > 10) {
-            const earlyMessages = this.conversationHistory.slice(0, -10);
-            // Simple concatenation for summary; could be improved with a smarter summary algorithm
-            summary = earlyMessages.map(msg => `${msg.role === 'user' ? 'Student' : 'Mentor'}: ${msg.content}`).join('\n');
-        }
-
-        // Build context from last 10 messages
-        const contextMessages = this.conversationHistory.slice(-10).map(msg => ({
+        // Use Gemini API with provided API key
+        const API_KEY = 'AIzaSyAPBW9vmiiymr3XvSadaqN9ZlQ75yKR-V4';
+        // Build context from last 6 conversation turns (user and assistant)
+        const contextMessages = this.conversationHistory.slice(-6).map(msg => ({
             role: msg.role,
             parts: [{ text: msg.content }]
         }));
 
-        // If the user message is very short or ambiguous, prepend last coding goal
-        let enhancedUserMessage = userMessage;
-        if (userMessage.trim().length < 10 || /^(\d+|yes|no|ok|sure|maybe|what|why|how|help|\?|\.|,|!|\s*)$/i.test(userMessage.trim())) {
-            if (lastCodingGoal) {
-                enhancedUserMessage = `Referring to my earlier question: "${lastCodingGoal}", my follow-up is: ${userMessage}`;
-            }
-        }
-        contextMessages.push({ role: 'user', parts: [{ text: enhancedUserMessage }] });
+        // Add the new user message
+        contextMessages.push({ role: 'user', parts: [{ text: userMessage }] });
 
-        // Find the last user coding goal/question for sticky context
-        let lastCodingGoal = '';
-        for (let i = this.conversationHistory.length - 1; i >= 0; i--) {
-            const msg = this.conversationHistory[i];
-            if (msg.role === 'user' && !msg.content.toLowerCase().includes('give me the code') && !msg.content.toLowerCase().includes('answer')) {
-                lastCodingGoal = msg.content;
-                break;
-            }
-        }
         const systemPrompt = `You are CodeMentor, an AI teaching assistant for AP Computer Science students learning ${this.currentSubject === 'python' ? 'Python (AP CSP)' : 'Java (AP CSA)'}.
 
 CRITICAL TEACHING RULES:
@@ -230,24 +177,34 @@ Your responses should be:
 - Conversational and encouraging
 - Focused on understanding concepts
 - Tailored to ${this.currentSubject === 'python' ? 'Python' : 'Java'} specifically
-- Educational, not just informational
+- Educational, not just informational`;
 
-The student's current coding goal/question is: ${lastCodingGoal ? lastCodingGoal : '[No coding goal detected yet]'}
-`;
-
-        // Build the contents array for Gemini
-        let contents = [
-            { role: 'system', parts: [{ text: systemPrompt }] },
-            ...contextMessages
-        ];
-
-        // Use the @google/genai SDK to generate content
-        const model = 'gemini-2.0-flash-001';
-        const sdkResponse = await ai.models.generateContent({
-            model,
-            contents,
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': API_KEY,
+            },
+            body: JSON.stringify({
+                contents: [
+                    { role: 'system', parts: [{ text: systemPrompt }] },
+                    ...contextMessages
+                ],
+                generationConfig: {
+                    temperature: 0.7,
+                    topK: 40,
+                    topP: 0.95,
+                    maxOutputTokens: 1024,
+                }
+            })
         });
-        return sdkResponse.text || (sdkResponse.candidates && sdkResponse.candidates[0]?.content?.parts[0]?.text) || 'Sorry, no response.';
+
+        if (!response.ok) {
+            throw new Error(`API request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
     }
 
 
