@@ -8,10 +8,12 @@ class CodeMentor {
         this.topicList = document.getElementById('topicList');
         this.conversationHistory = [];
         this.lastTopic = null;
-        
+
+        this.loadConversationHistory();
         this.initializeEventListeners();
         this.loadTopics();
         this.setupAutoResize();
+        this.renderConversationHistory();
     }
 
     initializeEventListeners() {
@@ -127,6 +129,7 @@ class CodeMentor {
         // Add user message
         this.addMessage('user', message);
         this.conversationHistory.push({ role: 'user', content: message });
+        this.saveConversationHistory();
         this.messageInput.value = '';
         this.messageInput.style.height = 'auto';
 
@@ -139,6 +142,7 @@ class CodeMentor {
             this.hideTypingIndicator();
             this.addMessage('assistant', response);
             this.conversationHistory.push({ role: 'assistant', content: response });
+            this.saveConversationHistory();
         } catch (error) {
             this.hideTypingIndicator();
             console.error('Gemini API Error:', error);
@@ -147,49 +151,61 @@ class CodeMentor {
             const errorMessage = `I'm having trouble connecting to the AI service right now. Please check your internet connection and try again. Error: ${error.message}`;
             this.addMessage('assistant', errorMessage);
             this.conversationHistory.push({ role: 'assistant', content: errorMessage });
+            this.saveConversationHistory();
         }
     }
 
     async generateAIResponse(userMessage) {
         // Use Gemini API with provided API key
         const API_KEY = 'AIzaSyAPBW9vmiiymr3XvSadaqN9ZlQ75yKR-V4';
-        // Build context from last 6 conversation turns (user and assistant)
-        const contextMessages = this.conversationHistory.slice(-6).map(msg => ({
-            role: msg.role,
-            parts: [{ text: msg.content }]
-        }));
+        
+        // Build conversation contents for API
+        const contents = [];
 
-        // Add the new user message
-        contextMessages.push({ role: 'user', parts: [{ text: userMessage }] });
+        // Add conversation history
+        for (let i = 0; i < this.conversationHistory.length; i++) {
+            const msg = this.conversationHistory[i];
+            contents.push({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: msg.content }]
+            });
+        }
 
+        // Add current user message with system instructions
         const systemPrompt = `You are CodeMentor, an AI teaching assistant for AP Computer Science students learning ${this.currentSubject === 'python' ? 'Python (AP CSP)' : 'Java (AP CSA)'}.
 
 CRITICAL TEACHING RULES:
 - NEVER provide complete solutions or finished code
-- NEVER do students' homework for them
+- NEVER do students' homework for them  
 - If asked for "the full code" or "complete solution", politely redirect to learning
 - Guide learning through hints, explanations, and step-by-step reasoning
 - Ask follow-up questions to promote critical thinking
 - Provide code templates with blanks for students to fill in
 - Teach debugging strategies rather than fixing code directly
+- REMEMBER the conversation context and build upon previous messages
 
 Your responses should be:
 - Conversational and encouraging
 - Focused on understanding concepts
 - Tailored to ${this.currentSubject === 'python' ? 'Python' : 'Java'} specifically
-- Educational, not just informational`;
+- Educational, not just informational
+- Context-aware of the ongoing conversation
 
-        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+Student question: ${userMessage}`;
+
+        contents.push({
+            role: 'user',
+            parts: [{ text: systemPrompt }]
+        });
+
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'x-goog-api-key': API_KEY,
             },
             body: JSON.stringify({
-                contents: [
-                    { role: 'system', parts: [{ text: systemPrompt }] },
-                    ...contextMessages
-                ],
+                contents: contents,
                 generationConfig: {
                     temperature: 0.7,
                     topK: 40,
@@ -206,6 +222,7 @@ Your responses should be:
         const data = await response.json();
         return data.candidates[0].content.parts[0].text;
     }
+
 
 
 
@@ -277,6 +294,45 @@ Your responses should be:
 
     scrollToBottom() {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+    }
+    // Save conversation history to localStorage
+    saveConversationHistory() {
+        try {
+            localStorage.setItem('codeMentor_conversationHistory', JSON.stringify(this.conversationHistory));
+        } catch (e) {
+            console.error('Failed to save conversation history:', e);
+        }
+    }
+
+    // Load conversation history from localStorage
+    loadConversationHistory() {
+        try {
+            const saved = localStorage.getItem('codeMentor_conversationHistory');
+            if (saved) {
+                this.conversationHistory = JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error('Failed to load conversation history:', e);
+            this.conversationHistory = [];
+        }
+    }
+
+    // Render conversation history to chat window
+    renderConversationHistory() {
+        this.chatMessages.innerHTML = '';
+        
+        if (!this.conversationHistory || !Array.isArray(this.conversationHistory) || this.conversationHistory.length === 0) {
+            // Add welcome message if no conversation history
+            this.addMessage('assistant', `<h3>Welcome to CodeMentor! 👋</h3>
+<p>I'm your AI teaching assistant for AP Computer Science. I'm here to help you understand concepts, debug code, and develop problem-solving skills.</p>
+<p><strong>Remember:</strong> I won't give you direct answers or complete solutions. Instead, I'll guide you through the learning process with hints, explanations, and step-by-step reasoning.</p>
+<p>What would you like to work on today?</p>`);
+            return;
+        }
+        
+        for (const msg of this.conversationHistory) {
+            this.addMessage(msg.role, msg.content);
+        }
     }
 }
 
