@@ -157,7 +157,7 @@ class CodeMentor {
 
     async generateAIResponse(userMessage) {
         // Use Gemini API with provided API key
-        const API_KEY = 'AIzaSyAPBW9vmiiymr3XvSadaqN9ZlQ75yKR-V4';
+        const API_KEY = CONFIG.GEMINI_API_KEY;
         
         // Build conversation contents for API
         const contents = [];
